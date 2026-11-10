@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -71,8 +72,12 @@ header h1{background:none}
 .side a.on{background:rgba(217,184,119,.14);color:var(--tx)}
 .prog{position:fixed;left:0;top:0;width:100%;height:2px;z-index:50;transform-origin:left;transform:scaleX(var(--p,0));background:linear-gradient(90deg,#b8955a,#f6e7bd)}
 .glow{position:fixed;left:-20vmax;top:-28vmax;width:62vmax;height:62vmax;z-index:-1;pointer-events:none;background:radial-gradient(closest-side,rgba(217,184,119,.15),transparent);transform:translate3d(0,calc(var(--p,0)*55vh),0)}
-html.pre .side,html.pre header,html.pre .months,html.pre .legend,html.pre .entry,html.pre .k,html.pre .list{opacity:0}
+html.pre .side,html.pre header,html.pre .months,html.pre .legend,.inv{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;margin-bottom:14px}.inv h2{grid-column:1/-1;margin:0;font-size:16px}.inv p{grid-column:1/-1;margin:0;color:var(--mut);font-size:14px}.inv p b{color:var(--g)}
+html.pre .entry,html.pre .inv,html.pre .k,html.pre .list{opacity:0}
 html.pre h1 .w{clip-path:inset(100% 0 -14% 0)}
+select{color-scheme:dark;color:#f3efe6}
+select option{background:#0e1015;color:#f3efe6}
+select option:checked{background:#2a2216;color:#f6e7bd}
 </style>
 <script>(function(){var d=document.documentElement;if(!('animate' in Element.prototype))return;if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches)return;d.classList.add('pre');setTimeout(function(){d.classList.remove('pre')},4000)})();</script>
 </head>
@@ -89,7 +94,8 @@ html.pre h1 .w{clip-path:inset(100% 0 -14% 0)}
   <div><label for="vl">Valor (R$)</label><input id="vl" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
   <div><label for="ds">Descrição (opcional)</label><input id="ds" type="text" maxlength="60" placeholder="Ex.: mercado"></div>
   
-  <button class="save" id="save">Adicionar</button></div><div class="card list" id="list">
+  <button class="save" id="save">Adicionar</button></div><div class="card inv" id="inv"><h2>Investido no ano</h2><div><label for="bs">Já investido (saldo anterior, separado dos aportes do mês)</label><input id="bs" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div><button class="save" id="bsave">Salvar</button><p id="invsum"></p></div>
+<div class="card list" id="list">
 </div>
 
 <div class="kpis" id="kpis"></div>
@@ -113,13 +119,14 @@ const $=id=>document.getElementById(id);
 const R=v=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const sum=a=>a.reduce((x,y)=>x+y,0);
 function persist(){try{localStorage.setItem(K2,JSON.stringify(E))}catch(e){}}
+let BASE=0;const K3="painel-financeiro-base-"+YEAR;try{BASE=parseFloat(localStorage.getItem(K3))||0}catch(e){}
 function delta(a,m){if(m===0)return"início do ano";const p=a[m-1],c=a[m];if(!p)return"sem mês anterior";const d=(c-p)/p*100;return(d>=0?"+":"")+d.toFixed(1).replace(".",",")+"% vs mês anterior"}
 function kpis(){
-  const g=D.g[sel],i=D.i[sel],rr=D.r[sel],tg=sum(D.g),ti=sum(D.i),tr=sum(D.r),pct=rr?i/rr*100:0;
+  const g=D.g[sel],i=D.i[sel],rr=D.r[sel],tg=sum(D.g),ti=BASE+sum(D.i),tr=sum(D.r),pct=rr?i/rr*100:0;
   
-  const items=[["Ganho em "+MES[sel],R(rr),delta(D.r,sel),"--c"],["Gasto em "+MES[sel],R(g),delta(D.g,sel),"--r"],["Investido em "+MES[sel],R(i),delta(D.i,sel),"--g"],["Saldo do mês",R(rr-g-i),"ganho − gasto − investido","--b"],
+  const items=[["Ganho em "+MES[sel],R(rr),delta(D.r,sel),"--c"],["Gasto em "+MES[sel],R(g),delta(D.g,sel),"--r"],["Investido em "+MES[sel],R(i),delta(D.i,sel),"--g"],["Saldo do mês",R(rr-g),"ganho − gasto (o investido já está guardado)","--b"],
   ["Ganho no ano",R(tr),"12 meses de "+YEAR,"--c"],
-  ["Gasto no ano",R(tg),"12 meses de "+YEAR,"--r"],["Investido no ano",R(ti),"12 meses de "+YEAR,"--g"],
+  ["Gasto no ano",R(tg),"12 meses de "+YEAR,"--r"],["Investido no ano",R(ti),"saldo anterior + aportes do ano","--g"],
   ["% do ganho investido",pct.toFixed(1).replace(".",",")+"%","investido ÷ ganho do mês","--y"]];
   $("kpis").innerHTML=items.map(x=>`<div class="k" style="--col:var(${x[3]})"><small>${x[0]}</small><b>${x[1]}</b><em>${x[2]}</em></div>`).join("");
 }
@@ -136,7 +143,7 @@ function line(){
   $("line").innerHTML=s;
 }
 function donut(){
-  const g=sum(D.g),i=sum(D.i),t=g+i,r=70,c=2*Math.PI*r;
+  const g=sum(D.g),i=BASE+sum(D.i),t=g+i,r=70,c=2*Math.PI*r;
   let s=`<circle cx="110" cy="110" r="${r}" fill="none" stroke="var(--line)" stroke-width="26"/>`;
   if(t){const pg=g/t*c;
     s+=`<circle cx="110" cy="110" r="${r}" fill="none" stroke="var(--r)" stroke-width="26" stroke-dasharray="${pg} ${c}" transform="rotate(-90 110 110)"/>
@@ -160,8 +167,8 @@ function render(){
   $("ano").textContent="Ano "+YEAR;
   $("contab").textContent="Contabilizando: "+MES[CUR];
   $("etit").textContent="Lançamento de "+MES[sel]+(sel===CUR?" (mês atual)":"");
-  calc();setDate();
-  tabs();kpis();list();days();line();donut();bars();window.fx&&window.fx();
+  calc();setDate();if(document.activeElement!==$("bs"))$("bs").value=BASE||"";
+  tabs();kpis();invSum();list();days();line();donut();bars();window.fx&&window.fx();
 }
 const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function setDate(){const f=$("dt"),last=new Date(YEAR,sel+1,0).getDate();f.min=iso(sel,1);f.max=iso(sel,last);if(!f.value||f.value.slice(5,7)!==pad(sel+1))f.value=sel===CUR?iso(CUR,now.getDate()):iso(sel,1)}
@@ -176,6 +183,9 @@ s+=`<path d="${cu.map((v,k)=>(k?"L":"M")+(L+k*w+w/2).toFixed(1)+","+(160-v/mc*14
 $("days").innerHTML=s}
 $("save").onclick=()=>{const v=parseFloat($("vl").value);if(!(v>0)){$("vl").focus();return}const d=$("dt").value;E.push({id:Date.now()+"-"+Math.random(),d,t:$("tp").value,v,n:$("ds").value.trim()});$("vl").value="";$("ds").value="";persist();sel=+d.slice(5,7)-1;render();$("vl").focus()};
 ["dt","tp","vl","ds"].forEach(id=>$(id).addEventListener("keydown",e=>{if(e.key==="Enter")$("save").click()}));
+function invSum(){const ap=sum(D.i);$("invsum").innerHTML="Já investido: <b>"+R(BASE)+"</b> · Aportes lançados no ano: <b>"+R(ap)+"</b> · Total investido no ano: <b>"+R(BASE+ap)+"</b>"}
+$("bsave").onclick=()=>{BASE=Math.max(0,parseFloat($("bs").value)||0);try{localStorage.setItem(K3,String(BASE))}catch(e){}render()};
+$("bs").addEventListener("keydown",e=>{if(e.key==="Enter")$("bsave").click()});
 render();
 </script>
 <script>
@@ -192,7 +202,7 @@ qa("h1 .w").forEach((w,i)=>rise(w,330+i*90,900));
 lift(q(".months"),450,".8em",560);lift(q(".legend"),560,".6em",520);
 settle(q(".entry"),640,820,.985,"1.2em");
 qa(".k").forEach((k,i)=>settle(k,760+i*70,760,.985,"1em"));
-lift(q(".list"),1200,".8em",600);
+settle(q(".inv"),700,780,.985,"1.1em");lift(q(".list"),1200,".8em",600);
 Promise.all(run.map(a=>a.finished.catch(()=>{}))).then(()=>{root.classList.remove("pre");run.forEach(a=>a.cancel());run.length=0});
 })();
 (function(){
