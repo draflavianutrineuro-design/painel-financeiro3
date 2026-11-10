@@ -86,12 +86,12 @@ select option:checked{background:#2a2216;color:#f6e7bd}
 <div class="wrap">
 <aside class="side"><div class="logo">◬</div><a href="#top"><b>▦</b>Painel</a><a href="#lanc"><b>＋</b>Lançar</a><a href="#list"><b>☰</b>Lista</a><a href="#graf"><b>⌁</b>Gráficos</a></aside><header id="top"><h1><span class="w">Painel</span> <span class="w">financeiro</span></h1><span id="ano"></span><span id="contab"></span></header>
 <div class="months" id="months"></div>
-<p class="legend"><i></i>Ponto verde = mês que você está contabilizando agora</p>
+<p class="legend"><i></i>Ponto bege = mês que você está contabilizando agora</p>
 
 <div class="card entry" id="lanc">
   <h2 id="etit"></h2>
   <div><label for="dt">Dia</label><input id="dt" type="date"></div>
-  <div><label for="tp">Tipo</label><select id="tp"><option value="g">Gasto</option><option value="r">Ganho</option><option value="i">Investimento</option></select></div>
+  <div><label for="tp">Tipo</label><select id="tp"><option value="g">Gasto</option><option value="r">Ganho</option><option value="i">Investimento (aporte)</option><option value="w">Resgate (retirada do investimento)</option></select></div>
   <div><label for="vl">Valor (R$)</label><input id="vl" type="number" min="0" step="0.01" inputmode="decimal" placeholder="0,00"></div>
   <div><label for="ds">Descrição (opcional)</label><input id="ds" type="text" maxlength="60" placeholder="Ex.: mercado"></div>
   
@@ -102,8 +102,8 @@ select option:checked{background:#2a2216;color:#f6e7bd}
 <div class="kpis" id="kpis"></div>
 
 <div class="grid" id="graf">
-  <div class="card wide"><h3>Ganhos, gastos e investimentos nos 12 meses</h3><div class="sc"><svg id="line" viewBox="0 0 700 270"></svg></div>
-    <div class="leg"><span><i style="background:var(--r)"></i>Gastos</span><span><i style="background:var(--c)"></i>Ganhos</span><span><i style="background:var(--g)"></i>Investimentos</span></div></div>
+  <div class="card wide"><h3>Ganhos, gastos, investimentos e resgates nos 12 meses</h3><div class="sc"><svg id="line" viewBox="0 0 700 270"></svg></div>
+    <div class="leg"><span><i style="background:var(--r)"></i>Gastos</span><span><i style="background:var(--c)"></i>Ganhos</span><span><i style="background:var(--g)"></i>Investimentos</span><span><i style="background:var(--y)"></i>Resgates</span></div></div>
   <div class="card wide"><h3 id="dtit"></h3><div class="sc"><svg id="days" viewBox="0 0 700 215"></svg></div></div>
   <div class="card"><h3>Gasto x investido no ano</h3><svg id="donut" viewBox="0 0 300 220"></svg></div>
   <div class="card"><h3>Investido por mês</h3><svg id="bars" viewBox="0 0 340 220"></svg></div>
@@ -113,9 +113,9 @@ select option:checked{background:#2a2216;color:#f6e7bd}
 const MES=["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
 const AB=MES.map(m=>m.slice(0,3));
 const now=new Date(),CUR=now.getMonth(),YEAR=now.getFullYear(),KEY="painel-financeiro-"+YEAR;
-let D={g:Array(12).fill(0),i:Array(12).fill(0),r:Array(12).fill(0)},E=[],sel=CUR;const K2="painel-financeiro-v2-"+YEAR,pad=n=>String(n).padStart(2,"0"),iso=(m,d)=>YEAR+"-"+pad(m+1)+"-"+pad(d);
+let D={g:Array(12).fill(0),i:Array(12).fill(0),r:Array(12).fill(0),w:Array(12).fill(0)},E=[],sel=CUR;const K2="painel-financeiro-v2-"+YEAR,pad=n=>String(n).padStart(2,"0"),iso=(m,d)=>YEAR+"-"+pad(m+1)+"-"+pad(d);
 try{const s=localStorage.getItem(K2);if(s)E=JSON.parse(s)||[];else{const o=localStorage.getItem(KEY);if(o){const p=JSON.parse(o);if(p&&p.g&&p.i)for(let m=0;m<12;m++)["g","i"].forEach(t=>{if(p[t][m]>0)E.push({id:Date.now()+"-"+m+t,d:iso(m,1),t,v:p[t][m],n:"Total lançado antes"})})}}}catch(e){}
-function calc(){D={g:Array(12).fill(0),i:Array(12).fill(0),r:Array(12).fill(0)};E.forEach(e=>{const m=+e.d.slice(5,7)-1;if(m>=0&&m<12&&e.d.slice(0,4)==YEAR)D[e.t][m]+=e.v})}
+function calc(){D={g:Array(12).fill(0),i:Array(12).fill(0),r:Array(12).fill(0),w:Array(12).fill(0)};E.forEach(e=>{const m=+e.d.slice(5,7)-1;if(m>=0&&m<12&&e.d.slice(0,4)==YEAR&&D[e.t])D[e.t][m]+=e.v})}
 const $=id=>document.getElementById(id);
 const R=v=>v.toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
 const sum=a=>a.reduce((x,y)=>x+y,0);
@@ -123,28 +123,30 @@ function persist(){try{localStorage.setItem(K2,JSON.stringify(E))}catch(e){}}
 let BASE=0;const K3="painel-financeiro-base-"+YEAR;try{BASE=parseFloat(localStorage.getItem(K3))||0}catch(e){}
 function delta(a,m){if(m===0)return"início do ano";const p=a[m-1],c=a[m];if(!p)return"sem mês anterior";const d=(c-p)/p*100;return(d>=0?"+":"")+d.toFixed(1).replace(".",",")+"% vs mês anterior"}
 function kpis(){
-  const g=D.g[sel],i=D.i[sel],rr=D.r[sel],tg=sum(D.g),ti=BASE+sum(D.i),tr=sum(D.r),pct=rr?i/rr*100:0;
+  const g=D.g[sel],i=D.i[sel],rr=D.r[sel],tg=sum(D.g),tw=sum(D.w),w=D.w[sel],ti=BASE+sum(D.i)-tw,tr=sum(D.r),pct=rr?i/rr*100:0;
   
   const items=[["Ganho em "+MES[sel],R(rr),delta(D.r,sel),"--c"],["Gasto em "+MES[sel],R(g),delta(D.g,sel),"--r"],["Investido em "+MES[sel],R(i),delta(D.i,sel),"--g"],["Saldo do mês",R(rr-g),"ganho − gasto (o investido já está guardado)","--b"],
   ["Ganho no ano",R(tr),"12 meses de "+YEAR,"--c"],
-  ["Gasto no ano",R(tg),"12 meses de "+YEAR,"--r"],["Investido no ano",R(ti),"saldo anterior + aportes do ano","--g"],
-  ["% do ganho investido",pct.toFixed(1).replace(".",",")+"%","investido ÷ ganho do mês","--y"]];
+  ["Gasto no ano",R(tg),"12 meses de "+YEAR,"--r"],["Investido no ano",R(ti),"saldo anterior + aportes − resgates","--g"],
+  ["% do ganho investido",pct.toFixed(1).replace(".",",")+"%","investido ÷ ganho do mês","--y"],
+  ["Resgatado em "+MES[sel],R(w),delta(D.w,sel),"--y"],["Resgatado no ano",R(tw),"retiradas do investimento em "+YEAR,"--y"],
+  ["Aporte líquido do mês",R(i-w),"aportes − resgates","--g"],["Aporte líquido no ano",R(sum(D.i)-tw),"aportes − resgates (sem saldo anterior)","--g"]];
   $("kpis").innerHTML=items.map(x=>`<div class="k" style="--col:var(${x[3]})"><small>${x[0]}</small><b>${x[1]}</b><em>${x[2]}</em></div>`).join("");
 }
 function line(){
-  const W=700,H=270,L=62,Rr=20,T=14,B=34,max=Math.max(100,...D.g,...D.i,...D.r)*1.1;
+  const W=700,H=270,L=62,Rr=20,T=14,B=34,max=Math.max(100,...D.g,...D.i,...D.r,...D.w)*1.1;
   const x=k=>L+k*(W-L-Rr)/11,y=v=>T+(H-T-B)*(1-v/max);
   let s="";
   for(let k=0;k<=4;k++){const v=max*k/4,yy=y(v);s+=`<line x1="${L}" x2="${W-Rr}" y1="${yy}" y2="${yy}" stroke="var(--line)"/><text x="${L-6}" y="${yy+4}" text-anchor="end">${Math.round(v).toLocaleString("pt-BR")}</text>`}
   AB.forEach((m,k)=>{s+=`<text x="${x(k)}" y="${H-12}" text-anchor="middle" ${k===sel?'style="fill:var(--tx);font-weight:700"':''}>${m}</text>`});
   const path=a=>a.map((v,k)=>(k?"L":"M")+x(k).toFixed(1)+","+y(v).toFixed(1)).join("");
-  [["--c",D.r],["--r",D.g],["--g",D.i]].forEach(([c,a])=>{
+  [["--c",D.r],["--r",D.g],["--g",D.i],["--y",D.w]].forEach(([c,a])=>{
     s+=`<path d="${path(a)}L${x(11)},${y(0)}L${x(0)},${y(0)}Z" fill="var(${c})" opacity=".12"/><path d="${path(a)}" fill="none" stroke="var(${c})" stroke-width="3" stroke-linejoin="round" style="filter:drop-shadow(0 0 4px var(${c}))"/>`;
     a.forEach((v,k)=>{s+=`<circle cx="${x(k)}" cy="${y(v)}" r="${k===sel?6:3}" fill="var(${c})"/>`})});
   $("line").innerHTML=s;
 }
 function donut(){
-  const g=sum(D.g),i=BASE+sum(D.i),t=g+i,r=70,c=2*Math.PI*r;
+  const g=sum(D.g),i=Math.max(0,BASE+sum(D.i)-sum(D.w)),t=g+i,r=70,c=2*Math.PI*r;
   let s=`<circle cx="110" cy="110" r="${r}" fill="none" stroke="var(--line)" stroke-width="26"/>`;
   if(t){const pg=g/t*c;
     s+=`<circle cx="110" cy="110" r="${r}" fill="none" stroke="var(--r)" stroke-width="26" stroke-dasharray="${pg} ${c}" transform="rotate(-90 110 110)"/>
@@ -174,7 +176,7 @@ function render(){
 const esc=s=>s.replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function setDate(){const f=$("dt"),last=new Date(YEAR,sel+1,0).getDate();f.min=iso(sel,1);f.max=iso(sel,last);if(!f.value||f.value.slice(5,7)!==pad(sel+1))f.value=sel===CUR?iso(CUR,now.getDate()):iso(sel,1)}
 function list(){const a=E.filter(e=>+e.d.slice(5,7)-1===sel&&e.d.slice(0,4)==YEAR).sort((x,y)=>y.d.localeCompare(x.d));
-$("list").innerHTML="<h3>Lançamentos de "+MES[sel]+"</h3>"+(a.length?a.map(e=>`<div class="row"><span class="d">${e.d.slice(8)}/${e.d.slice(5,7)}</span><span class="n">${{g:"Gasto",i:"Investimento",r:"Ganho"}[e.t]}${e.n?" · "+esc(e.n):""}</span><span class="v" style="color:var(--${{g:"r",i:"g",r:"c"}[e.t]})">${R(e.v)}</span><button class="x" data-id="${esc(String(e.id))}" aria-label="Remover">×</button></div>`).join(""):'<span style="color:var(--mut);font-size:14px">Nenhum lançamento ainda neste mês.</span>');
+$("list").innerHTML="<h3>Lançamentos de "+MES[sel]+"</h3>"+(a.length?a.map(e=>`<div class="row"><span class="d">${e.d.slice(8)}/${e.d.slice(5,7)}</span><span class="n">${{g:"Gasto",i:"Investimento",r:"Ganho",w:"Resgate"}[e.t]}${e.n?" · "+esc(e.n):""}</span><span class="v" style="color:var(--${{g:"r",i:"g",r:"c",w:"y"}[e.t]})">${R(e.v)}</span><button class="x" data-id="${esc(String(e.id))}" aria-label="Remover">×</button></div>`).join(""):'<span style="color:var(--mut);font-size:14px">Nenhum lançamento ainda neste mês.</span>');
 document.querySelectorAll(".x").forEach(b=>b.onclick=()=>{E=E.filter(e=>String(e.id)!==b.dataset.id);persist();render()})}
 function days(){const n=new Date(YEAR,sel+1,0).getDate(),a=Array(n).fill(0);E.forEach(e=>{if(e.t==="g"&&+e.d.slice(5,7)-1===sel&&e.d.slice(0,4)==YEAR)a[+e.d.slice(8)-1]+=e.v});
 $("dtit").textContent="Gasto por dia em "+MES[sel]+" · acumulado: "+R(sum(a));
@@ -184,7 +186,7 @@ s+=`<path d="${cu.map((v,k)=>(k?"L":"M")+(L+k*w+w/2).toFixed(1)+","+(160-v/mc*14
 $("days").innerHTML=s}
 $("save").onclick=()=>{const v=parseFloat($("vl").value);if(!(v>0)){$("vl").focus();return}const d=$("dt").value;E.push({id:Date.now()+"-"+Math.random(),d,t:$("tp").value,v,n:$("ds").value.trim()});$("vl").value="";$("ds").value="";persist();sel=+d.slice(5,7)-1;render();$("vl").focus()};
 ["dt","tp","vl","ds"].forEach(id=>$(id).addEventListener("keydown",e=>{if(e.key==="Enter")$("save").click()}));
-function invSum(){const ap=sum(D.i);$("invsum").innerHTML="Já investido: <b>"+R(BASE)+"</b> · Aportes lançados no ano: <b>"+R(ap)+"</b> · Total investido no ano: <b>"+R(BASE+ap)+"</b>"}
+function invSum(){const ap=sum(D.i),rs=sum(D.w);$("invsum").innerHTML="Já investido: <b>"+R(BASE)+"</b> · Aportes no ano: <b>"+R(ap)+"</b> · Resgates no ano: <b>"+R(rs)+"</b> · Total investido: <b>"+R(BASE+ap-rs)+"</b>"}
 $("bsave").onclick=()=>{BASE=Math.max(0,parseFloat($("bs").value)||0);try{localStorage.setItem(K3,String(BASE))}catch(e){}render()};
 $("bs").addEventListener("keydown",e=>{if(e.key==="Enter")$("bsave").click()});
 render();
@@ -233,10 +235,16 @@ const kick=()=>{if(!tick)tick=requestAnimationFrame(loop)};
 addEventListener("scroll",kick,{passive:true});addEventListener("resize",kick);loop();
 /* luz dourada que segue o mouse */
 document.addEventListener("pointermove",e=>{const c=e.target.closest&&e.target.closest(".card,.k");if(!c)return;const r=c.getBoundingClientRect();c.style.setProperty("--mx",e.clientX-r.left+"px");c.style.setProperty("--my",e.clientY-r.top+"px")},{passive:true});
-/* menu lateral acompanha a secao visivel */
-const links=[...document.querySelectorAll(".side a")],io=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)links.forEach(a=>a.classList.toggle("on",a.getAttribute("href")==="#"+e.target.id))}),{rootMargin:"-35% 0px -55% 0px"});
-["top","lanc","list","graf"].forEach(id=>{const el=document.getElementById(id);el&&io.observe(el)});
 })();
+</script>
+<script>
+/* menu lateral acompanha a secao visivel, passo a passo */
+(function(){const links=[...document.querySelectorAll(".side a")],ids=["top","lanc","list","graf"],secs=ids.map(id=>document.getElementById(id));let t=false;
+function upd(){t=false;const line=innerHeight*.4;let cur=0;secs.forEach((el,k)=>{if(el&&el.getBoundingClientRect().top<=line)cur=k});
+if(scrollY<4)cur=0;else if(innerHeight+scrollY>=document.documentElement.scrollHeight-4)cur=secs.length-1;
+links.forEach(a=>a.classList.toggle("on",a.getAttribute("href")==="#"+ids[cur]))}
+function kick(){if(!t){t=true;requestAnimationFrame(upd)}}
+addEventListener("scroll",kick,{passive:true});addEventListener("resize",kick);upd()})();
 </script>
 </body>
 </html>
